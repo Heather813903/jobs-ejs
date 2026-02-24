@@ -5,6 +5,9 @@ const express = require("express");
 const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
 
+const passport = require("passport");
+const passportInit = require("./passport/passportInit");
+
 const app = express();
 
 app.set("view engine", "ejs");
@@ -37,35 +40,28 @@ if (app.get("env") === "production") {
 
 app.use(session(sessionParms));
 
+// ===== Passport =====
+passportInit();
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ===== Flash + locals middleware =====
 app.use(require("connect-flash")());
+app.use(require("./middleware/storeLocals"));
 
-
-
-app.get("/secretWord", (req, res) => {
-  if (!req.session.secretWord) {
-    req.session.secretWord = "syzygy";
-  }
-
-  res.locals.info = req.flash("info");
-  res.locals.errors = req.flash("error");
-
-  res.render("secretWord", { secretWord: req.session.secretWord });
+// ===== Routes =====
+app.get("/", (req, res) => {
+  res.render("index");
 });
 
+app.use("/sessions", require("./routes/sessionRoutes"));
 
-app.post("/secretWord", (req, res) => {
-  if (req.body.secretWord.toUpperCase()[0] == "P") {
-    req.flash("error", "That word won't work!");
-    req.flash("error", "You can't use words that start with p.");
-  } else {
-    req.session.secretWord = req.body.secretWord;
-    req.flash("info", "The secret word was changed.");
-  }
-  res.redirect("/secretWord");
-});
+// ✅ FINAL ASSIGNMENT CHANGE: secretWord router + auth middleware
+const secretWordRouter = require("./routes/secretWord");
+const auth = require("./middleware/auth");
+app.use("/secretWord", auth, secretWordRouter);
 
-
-
+// ===== 404 + error handler =====
 app.use((req, res) => {
   res.status(404).send(`That page (${req.url}) was not found.`);
 });
@@ -75,11 +71,12 @@ app.use((err, req, res, next) => {
   res.status(500).send(err.message);
 });
 
-
 const port = process.env.PORT || 3000;
 
 const start = async () => {
   try {
+    await require("./db/connect")(process.env.MONGO_URI);
+
     app.listen(port, () =>
       console.log(`Server is listening on port ${port}...`)
     );
