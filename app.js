@@ -71,6 +71,9 @@ app.use("/sessions", require("./routes/sessionRoutes"));
 const auth = require("./middleware/auth");
 app.use("/secretWord", auth, require("./routes/secretWord"));
 
+const jobsRouter = require("./routes/jobs");
+app.use("/jobs", auth, jobsRouter);
+
 
 app.use((err, req, res, next) => {
   
@@ -86,7 +89,7 @@ const port = process.env.PORT || 3000;
 const start = async () => {
   try {
     await connectDB(process.env.MONGO_URI);
-    console.log("✅ Connected to MongoDB");
+    console.log("Connected to MongoDB");
     app.listen(port, () => console.log(`Server is listening on port ${port}...`));
   } catch (error) {
     console.log(" Startup error:", error.message);
