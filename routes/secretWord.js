@@ -10,11 +10,13 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", (req, res) => {
-  if (req.body.secretWord.toUpperCase()[0] == "P") {
+  const { secretWord } = req.body;
+
+  if (secretWord && secretWord.toUpperCase()[0] === "P") {
     req.flash("error", "That word won't work!");
     req.flash("error", "You can't use words that start with p.");
   } else {
-    req.session.secretWord = req.body.secretWord;
+    req.session.secretWord = secretWord;
     req.flash("info", "The secret word was changed.");
   }
 
