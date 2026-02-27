@@ -13,7 +13,12 @@ const passportInit = require("./passport/passportInit");
 
 const connectDB = require("./db/connect");
 
+const helmet = require("helmet");
+const xss = require("xss-clean");
+const rateLimit = require("express-rate-limit");
+
 const app = express();
+
 
 app.set("view engine", "ejs");
 
@@ -30,6 +35,16 @@ app.use((req, res, next) => {
   csrf.getToken(req, res); 
   next();
 });
+
+app.use(helmet());
+app.use(xss());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use(limiter);
 
 
 const store = new MongoDBStore({
