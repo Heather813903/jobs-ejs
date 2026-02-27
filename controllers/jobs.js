@@ -1,7 +1,7 @@
 const Job = require("../models/Job");
 
 const flashMongooseValidationErrors = (req, err) => {
-  // Mongoose validation errors live in err.errors
+  
   if (err && err.name === "ValidationError" && err.errors) {
     Object.values(err.errors).forEach((e) => req.flash("error", e.message));
     return true;
