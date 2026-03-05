@@ -1,22 +1,31 @@
 <h1>The Jobs EJS Application</h1>
+
 <% if (user) { %>
-   <p>User <%= user.name %> is logged on.</p>
-   <form method="POST" action="/sessions/logoff">
-   <button>Logoff</button>
-   </form>
+  <p>User <%= user.username || user.email || user.name || user._id %> is logged on.</p>
+
+  <form method="POST" action="/sessions/logoff">
+    <button type="submit">Logoff</button>
+    <input type="hidden" name="_csrf" value="<%= _csrf %>" />
+  </form>
+
+  <hr />
+<% } else { %>
+  <p>You are not logged on.</p>
+
+  <a href="/sessions/logon"><button type="button">Logon</button></a>
+  <a href="/sessions/register"><button type="button">Register</button></a>
+
+  <hr />
 <% } %>
-<% if (errors) {
-    errors.forEach((err) => { %>
-      <div>
-        Error: <%= err %>
-      </div>
-    <% })
-  } %>
-  <% if (info) {
-    info.forEach((msg) => { %>
-      <div>
-        Info: <%= msg %>
-      </div>
-    <% })
-  } %>
-<hr />
+
+<% if (errors && errors.length) { %>
+  <% errors.forEach((m) => { %>
+    <p><%= m %></p>
+  <% }) %>
+<% } %>
+
+<% if (info && info.length) { %>
+  <% info.forEach((m) => { %>
+    <p><%= m %></p>
+  <% }) %>
+<% } %>

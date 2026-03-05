@@ -5,31 +5,60 @@ const express = require("express");
 const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
 
+const cookieParser = require("cookie-parser");
+const csrf = require("host-csrf");
+
 const passport = require("passport");
 const passportInit = require("./passport/passportInit");
 
+const connectDB = require("./db/connect");
+
+const helmet = require("helmet");
+const xss = require("xss-clean");
+const rateLimit = require("express-rate-limit");
+
 const app = express();
 
+
 app.set("view engine", "ejs");
+
+
 app.use(express.urlencoded({ extended: true }));
 
-// ===== Mongo session store =====
-const url = process.env.MONGO_URI;
+app.use(cookieParser(process.env.SESSION_SECRET));
+
+
+app.use(csrf.csrf());
+
+
+app.use((req, res, next) => {
+  csrf.getToken(req, res); 
+  next();
+});
+
+app.use(helmet());
+app.use(xss());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use(limiter);
+
 
 const store = new MongoDBStore({
-  uri: url,
+  uri: process.env.MONGO_URI,
   collection: "mySessions",
 });
 
-store.on("error", function (error) {
-  console.log(error);
-});
+store.on("error", (error) => console.log("MongoDBStore error:", error));
 
 const sessionParms = {
   secret: process.env.SESSION_SECRET,
   resave: true,
   saveUninitialized: true,
-  store: store,
+  store,
   cookie: { secure: false, sameSite: "strict" },
 };
 
@@ -40,33 +69,32 @@ if (app.get("env") === "production") {
 
 app.use(session(sessionParms));
 
-// ===== Passport =====
+
 passportInit();
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ===== Flash + locals middleware =====
+
 app.use(require("connect-flash")());
 app.use(require("./middleware/storeLocals"));
 
-// ===== Routes =====
-app.get("/", (req, res) => {
-  res.render("index");
-});
+
+app.get("/", (req, res) => res.render("index"));
 
 app.use("/sessions", require("./routes/sessionRoutes"));
 
-// ✅ FINAL ASSIGNMENT CHANGE: secretWord router + auth middleware
-const secretWordRouter = require("./routes/secretWord");
 const auth = require("./middleware/auth");
-app.use("/secretWord", auth, secretWordRouter);
+app.use("/secretWord", auth, require("./routes/secretWord"));
 
-// ===== 404 + error handler =====
-app.use((req, res) => {
-  res.status(404).send(`That page (${req.url}) was not found.`);
-});
+const jobsRouter = require("./routes/jobs");
+app.use("/jobs", auth, jobsRouter);
+
 
 app.use((err, req, res, next) => {
+  
+  if (err && err.name === "CSRFError") {
+    return res.status(403).send("CSRF validation failed.");
+  }
   console.log(err);
   res.status(500).send(err.message);
 });
@@ -75,13 +103,12 @@ const port = process.env.PORT || 3000;
 
 const start = async () => {
   try {
-    await require("./db/connect")(process.env.MONGO_URI);
-
-    app.listen(port, () =>
-      console.log(`Server is listening on port ${port}...`)
-    );
+    await connectDB(process.env.MONGO_URI);
+    console.log("Connected to MongoDB");
+    app.listen(port, () => console.log(`Server is listening on port ${port}...`));
   } catch (error) {
-    console.log(error);
+    console.log(" Startup error:", error.message);
+    process.exit(1);
   }
 };
 
